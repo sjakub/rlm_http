@@ -1,0 +1,38 @@
+
+OVERVIEW
+
+ This is a FreeRADIUS module, that will try to perform
+ a remote HTTP server request using HTTP basic auth.
+ It can be configured to use GET or POST
+ requests, and to send POST payload to the server.
+
+INSTALLATION
+
+ - Copy the entire rlm_http directory to src/modules/
+   in FreeRADIUS source tree.
+ - Add 'rlm_http' at the end of src/modules/stable file
+ - Configure and build FreeRADIUS
+ - Install FreeRADIUS
+ - Modify its configuration to use http module
+
+   By default (and for installations that use / prefix),
+   modify /etc/raddb/sites-available/default
+   and add 'http' line in 'authorize' section (before pap module)
+   In 'authenticate' section add following:
+  
+    Auth-Type HTTP {
+      http
+    }
+
+   Also, create /etc/raddb/modules/http file with
+   the configuration to be used by this module. For instance:
+
+    http {
+      host         = example.com
+      port         = 80
+      timeout      = 5
+      url          = /url/to/use/
+      method       = POST
+      payload      = '{ "json_key": [ "var1", "var2", "var3" ] }'
+      payload_type = 'application/json'
+    }
