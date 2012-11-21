@@ -60,11 +60,9 @@ RCSID ( "$Id$" )
 #define STR_HELPER(x) #x
 #define STR(x) STR_HELPER(x)
 
-#define D_LOG(fmt, ...)   RDEBUG ( "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
+#define RD_LOG(fmt, ...)   RDEBUG ( "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
 
-// Easier debugging:
-// #define D_LOG(fmt, ...)   radlog ( L_INFO, "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
-
+#define D_LOG(fmt, ...)   radlog ( L_DBG, "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
 #define I_LOG(fmt, ...)   radlog ( L_INFO, "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
 #define E_LOG(fmt, ...)   radlog ( L_ERR, "%s(): " fmt, __FUNCTION__, ## __VA_ARGS__)
 
@@ -128,7 +126,7 @@ static void append_str ( struct string * str, const char * what );
 static void append_data ( struct string * str, const char * what, int what_len );
 static char * get_attr_name ( int attr );
 static char * base64_encode ( struct string * src );
-static int http_do_request ( int sockfd, rlm_http_t * data, const char * username, const char * password );
+static int http_do_request ( int sockfd, rlm_http_t * data, REQUEST * request );
 
 /*
  *  Do any per-module initialization that is separate to each
@@ -277,12 +275,12 @@ static int http_authorize ( void *instance, REQUEST *request )
     // quiet the compiler
     instance = instance;
 
-    D_LOG ( "Checking attributes..." );
+    RD_LOG ( "Checking attributes..." );
 
     for ( vp = request->config_items; vp != NULL; vp = vp->next )
     {
-        D_LOG ( "Attribute: %s [%d]; Type: %d; Length: %d",
-                get_attr_name ( vp->attribute ), vp->attribute, vp->type, ( int ) vp->length );
+        RD_LOG ( "Attribute: %s [%d]; Type: %d; Length: %d",
+                 get_attr_name ( vp->attribute ), vp->attribute, vp->type, ( int ) vp->length );
 
         if ( vp->attribute == PW_AUTH_TYPE )
             auth_type = TRUE;
@@ -297,11 +295,11 @@ static int http_authorize ( void *instance, REQUEST *request )
         return RLM_MODULE_NOOP;
     }
 
-    D_LOG ( "Setting Auth-Type = " HTTP_AUTH_TYPE );
+    RD_LOG ( "Setting Auth-Type = " HTTP_AUTH_TYPE );
 
     pairadd ( &request->config_items, pairmake ( "Auth-Type", HTTP_AUTH_TYPE, T_OP_EQ ) );
 
-    D_LOG ( "Returning RLM_MODULE_UPDATED" );
+    RD_LOG ( "Returning RLM_MODULE_UPDATED" );
 
     return RLM_MODULE_UPDATED;
 }
@@ -360,7 +358,7 @@ static int http_authenticate ( void * instance, REQUEST * request )
         }
     }
 
-    D_LOG ( "Trying to connect to %s:%d...", inet_ntoa ( data->host_addr.sin_addr ), data->port );
+    RD_LOG ( "Trying to connect to %s:%d...", inet_ntoa ( data->host_addr.sin_addr ), data->port );
 
     if ( connect ( sockfd, ( struct sockaddr* ) &data->host_addr, sizeof ( data->host_addr ) ) < 0 )
     {
@@ -372,10 +370,9 @@ static int http_authenticate ( void * instance, REQUEST * request )
         return RLM_MODULE_FAIL;
     }
 
-    D_LOG ( "Connected to %s:%d", inet_ntoa ( data->host_addr.sin_addr ), data->port );
+    RD_LOG ( "Connected to %s:%d", inet_ntoa ( data->host_addr.sin_addr ), data->port );
 
-    int resp_code = http_do_request ( sockfd, data,
-                                      request->username->vp_strvalue, request->password->vp_strvalue );
+    int resp_code = http_do_request ( sockfd, data, request );
 
     close ( sockfd );
     sockfd = -1;
@@ -388,13 +385,13 @@ static int http_authenticate ( void * instance, REQUEST * request )
         return RLM_MODULE_FAIL;
     }
 
-    D_LOG ( "UserName: '%s'; Password: '%s'; Response Code: %d",
-            request->username->vp_strvalue, request->password->vp_strvalue,
-            resp_code );
+    RD_LOG ( "UserName: '%s'; Password: '%s'; Response Code: %d",
+             request->username->vp_strvalue, request->password->vp_strvalue,
+             resp_code );
 
     if ( resp_code == 401 )
     {
-        D_LOG ( "Not authorized. Returning RLM_MODULE_REJECT" );
+        RD_LOG ( "Not authorized. Returning RLM_MODULE_REJECT" );
 
         return RLM_MODULE_REJECT;
     }
@@ -407,12 +404,12 @@ static int http_authenticate ( void * instance, REQUEST * request )
         return RLM_MODULE_FAIL;
     }
 
-    D_LOG ( "Authorized; Returning RLM_MODULE_OK" );
+    RD_LOG ( "Authorized; Returning RLM_MODULE_OK" );
 
     return RLM_MODULE_OK;
 }
 
-static int http_do_request ( int sockfd, rlm_http_t* data, const char* username, const char* password )
+static int http_do_request ( int sockfd, rlm_http_t* data, REQUEST * request )
 {
     struct string str;
 
@@ -420,9 +417,9 @@ static int http_do_request ( int sockfd, rlm_http_t* data, const char* username,
 
     str.data_size = 0;
 
-    append_str ( &str, username );
+    append_str ( &str, request->username->vp_strvalue );
     append_str ( &str, ":" );
-    append_str ( &str, password );
+    append_str ( &str, request->password->vp_strvalue );
 
     char * enc_str = base64_encode ( &str );
 
@@ -444,7 +441,7 @@ static int http_do_request ( int sockfd, rlm_http_t* data, const char* username,
 
     int written = 0;
 
-    D_LOG ( "Writing: '%s'", str.buffer );
+    RD_LOG ( "Writing: '%s'", str.buffer );
 
     while ( written < str.data_size )
     {
@@ -502,7 +499,7 @@ static int http_do_request ( int sockfd, rlm_http_t* data, const char* username,
 
     tmp[off] = 0;
 
-    D_LOG ( "Received response: '%s'", tmp );
+    RD_LOG ( "Received response: '%s'", tmp );
 
     // HTTP/1.1 401 Authorization Required
     // HTTP/1.1 200 OK
