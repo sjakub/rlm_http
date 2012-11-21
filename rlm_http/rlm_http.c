@@ -706,7 +706,7 @@ static char * base64_encode ( struct string * src )
     /* encode all full triples */
     while ( sourcelen >= 3 )
     {
-        base64_encode_triple ( source, target );
+        base64_encode_triple ( ( unsigned char* ) source, target );
 
         sourcelen -= 3;
         source += 3;
