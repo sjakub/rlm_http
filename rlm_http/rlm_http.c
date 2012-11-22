@@ -178,13 +178,13 @@ static int http_instantiate ( CONF_SECTION *conf, void **instance )
 
     int is_post = FALSE;
 
-    if ( strcasestr ( data->method, "post" ) == 0 )
+    if ( strcasecmp ( data->method, "post" ) == 0 )
     {
         is_post = TRUE;
     }
     else
     {
-        if ( strcasestr ( data->method, "get" ) != 0 )
+        if ( strcasecmp ( data->method, "get" ) != 0 )
         {
             E_LOG ( "Invalid method configured: '%s'; Using GET", data->method );
 
