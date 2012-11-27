@@ -320,7 +320,11 @@ static int http_authenticate ( void * instance, REQUEST * request )
         return RLM_MODULE_INVALID;
     }
 
-    if ( !request->username || ( request->username->attribute != PW_USER_NAME ) )
+    /* If not proxied, the username has PW_USER_NAME set.
+       If proxied, the username has PW_STRIPPED_USER_NAME set. */
+    if ( !request->username
+        || ( request->username->attribute != PW_USER_NAME
+            && request->username->attribute != PW_STRIPPED_USER_NAME ) )
     {
         E_LOG ( "No username set (RLM_MODULE_INVALID)" );
         return RLM_MODULE_INVALID;
